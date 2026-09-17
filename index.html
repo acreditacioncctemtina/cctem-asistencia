@@ -190,31 +190,29 @@ function iniciarScanner() {
 
 function registrar(codigoLeido) {
 
-  let rut = null;
+  let rut = codigoLeido.trim();
 
   /*
-   * CASO 1:
-   * El código leído es nuestro QR.
-   * El QR contiene una URL con ?rut=...
+   * Si es un QR, contiene nuestra URL.
+   * Extraemos el RUT.
    */
 
   try {
 
     const url = new URL(codigoLeido);
 
-    rut = url.searchParams.get("rut");
+    const rutQR = url.searchParams.get("rut");
 
-  }
+    if (rutQR) {
+      rut = rutQR;
+    }
 
-  catch (error) {
+  } catch (error) {
 
     /*
-     * CASO 2:
-     * El código leído es un código de barras.
-     * En ese caso esperamos que contenga directamente el RUT.
+     * Si no es una URL, asumimos que es
+     * un código de barras que contiene el RUT.
      */
-
-    rut = codigoLeido;
 
   }
 
@@ -222,7 +220,7 @@ function registrar(codigoLeido) {
   if (!rut) {
 
     document.getElementById("resultado").innerHTML =
-      "❌ Código no válido";
+      "❌ No se pudo leer el RUT";
 
     setTimeout(reiniciar, 2000);
 
@@ -230,47 +228,6 @@ function registrar(codigoLeido) {
 
   }
 
-
-  /*
-   * Limpiamos espacios.
-   */
-
-  rut = rut.trim();
-
-
-  /*
-   * Comprobamos que parezca un RUT chileno.
-   * Acepta:
-   * 21.989.261-6
-   * 21989261-6
-   * 219892616
-   */
-
-  const rutLimpio = rut
-    .replace(/\./g, "")
-    .replace(/\s/g, "")
-    .toUpperCase();
-
-
-  const patronRUT = /^\d{7,8}-?[0-9K]$/;
-
-
-  if (!patronRUT.test(rutLimpio)) {
-
-    document.getElementById("resultado").innerHTML =
-      "❌ Código no válido<br><br>" +
-      "Leído: " + codigoLeido;
-
-    setTimeout(reiniciar, 2500);
-
-    return;
-
-  }
-
-
-  /*
-   * Mandamos el RUT al Web App.
-   */
 
   const urlRegistro =
     SCRIPT_URL +
