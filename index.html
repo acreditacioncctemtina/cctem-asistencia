@@ -84,7 +84,7 @@
 
     <h1>📷 Asistencia</h1>
 
-    <p>Escanea el QR de la credencial</p>
+    <p>Escanea el código de la credencial</p>
 
     <div id="reader"></div>
 
@@ -147,11 +147,24 @@ function iniciarScanner() {
     },
 
     {
-      fps: 10,
+      fps: 15,
+
       qrbox: {
-        width: 250,
-        height: 250
-      }
+        width: 300,
+        height: 180
+      },
+
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E
+      ]
+
     },
 
     (decodedText) => {
@@ -175,41 +188,97 @@ function iniciarScanner() {
 }
 
 
-function registrar(urlQR) {
+function registrar(codigoLeido) {
+
+  let rut = null;
+
+  /*
+   * CASO 1:
+   * El código leído es nuestro QR.
+   * El QR contiene una URL con ?rut=...
+   */
 
   try {
 
-    const url = new URL(urlQR);
+    const url = new URL(codigoLeido);
 
-    const rut = url.searchParams.get("rut");
-
-    if (!rut) {
-
-      document.getElementById("resultado").innerHTML =
-        "❌ QR no válido";
-
-      setTimeout(reiniciar, 2000);
-
-      return;
-    }
-
-    const urlRegistro =
-      SCRIPT_URL +
-      "?rut=" +
-      encodeURIComponent(rut);
-
-    window.location.href = urlRegistro;
+    rut = url.searchParams.get("rut");
 
   }
 
   catch (error) {
 
+    /*
+     * CASO 2:
+     * El código leído es un código de barras.
+     * En ese caso esperamos que contenga directamente el RUT.
+     */
+
+    rut = codigoLeido;
+
+  }
+
+
+  if (!rut) {
+
     document.getElementById("resultado").innerHTML =
-      "❌ QR no válido";
+      "❌ Código no válido";
 
     setTimeout(reiniciar, 2000);
 
+    return;
+
   }
+
+
+  /*
+   * Limpiamos espacios.
+   */
+
+  rut = rut.trim();
+
+
+  /*
+   * Comprobamos que parezca un RUT chileno.
+   * Acepta:
+   * 21.989.261-6
+   * 21989261-6
+   * 219892616
+   */
+
+  const rutLimpio = rut
+    .replace(/\./g, "")
+    .replace(/\s/g, "")
+    .toUpperCase();
+
+
+  const patronRUT = /^\d{7,8}-?[0-9K]$/;
+
+
+  if (!patronRUT.test(rutLimpio)) {
+
+    document.getElementById("resultado").innerHTML =
+      "❌ Código no válido<br><br>" +
+      "Leído: " + codigoLeido;
+
+    setTimeout(reiniciar, 2500);
+
+    return;
+
+  }
+
+
+  /*
+   * Mandamos el RUT al Web App.
+   */
+
+  const urlRegistro =
+    SCRIPT_URL +
+    "?rut=" +
+    encodeURIComponent(rut);
+
+
+  window.location.href = urlRegistro;
 
 }
 
