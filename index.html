@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Asistencia CCTEM</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 25px 15px;
+      margin: 0;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      margin-bottom: 5px;
+    }
+
+    #login, #scanner-container {
+      max-width: 450px;
+      margin: auto;
+    }
+
+    input {
+      width: 90%;
+      max-width: 300px;
+      padding: 14px;
+      font-size: 18px;
+      margin: 15px 0;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 14px 25px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+    }
+
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      margin: 25px auto;
+    }
+
+    #resultado {
+      font-size: 20px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="login">
+
+    <h1>🔐 CCTEM</h1>
+
+    <p>Acceso exclusivo para staff</p>
+
+    <input
+      type="password"
+      id="clave"
+      placeholder="Código de staff"
+    >
+
+    <br>
+
+    <button onclick="entrar()">
+      ENTRAR
+    </button>
+
+    <div id="mensaje"></div>
+
+  </div>
+
+
+  <div id="scanner-container" style="display:none">
+
+    <h1>📷 Asistencia</h1>
+
+    <p>Escanea el QR de la credencial</p>
+
+    <div id="reader"></div>
+
+    <div id="resultado"></div>
+
+  </div>
+
+
+<script>
+
+const CLAVE = "CCTEM2026";
+
+const SCRIPT_URL =
+"https://script.google.com/macros/s/AKfycbzvV4yumUNqjOhUrgS7zW6O01XLZtLpsSL3lXLhvrpT1R_955x_u_vafA1RuZJsd7IACA/exec";
+
+
+function entrar() {
+
+  const clave = document.getElementById("clave").value;
+
+  if (clave !== CLAVE) {
+
+    document.getElementById("mensaje").innerHTML =
+      "❌ Código incorrecto";
+
+    return;
+  }
+
+  localStorage.setItem(
+    "cctem_staff",
+    "autorizado"
+  );
+
+  iniciar();
+
+}
+
+
+function iniciar() {
+
+  document.getElementById("login").style.display =
+    "none";
+
+  document.getElementById("scanner-container").style.display =
+    "block";
+
+  iniciarScanner();
+
+}
+
+
+function iniciarScanner() {
+
+  const scanner = new Html5Qrcode("reader");
+
+  scanner.start(
+
+    {
+      facingMode: "environment"
+    },
+
+    {
+      fps: 10,
+      qrbox: {
+        width: 250,
+        height: 250
+      }
+    },
+
+    (decodedText) => {
+
+      scanner.stop();
+
+      registrar(decodedText);
+
+    },
+
+    () => {}
+
+  ).catch((error) => {
+
+    document.getElementById("resultado").innerHTML =
+      "❌ No se pudo abrir la cámara.<br><br>" +
+      "Revisa que Safari tenga permiso para usar la cámara.";
+
+  });
+
+}
+
+
+function registrar(urlQR) {
+
+  try {
+
+    const url = new URL(urlQR);
+
+    const rut = url.searchParams.get("rut");
+
+    if (!rut) {
+
+      document.getElementById("resultado").innerHTML =
+        "❌ QR no válido";
+
+      setTimeout(reiniciar, 2000);
+
+      return;
+    }
+
+    const urlRegistro =
+      SCRIPT_URL +
+      "?rut=" +
+      encodeURIComponent(rut);
+
+    window.location.href = urlRegistro;
+
+  }
+
+  catch (error) {
+
+    document.getElementById("resultado").innerHTML =
+      "❌ QR no válido";
+
+    setTimeout(reiniciar, 2000);
+
+  }
+
+}
+
+
+function reiniciar() {
+
+  document.getElementById("resultado").innerHTML = "";
+
+  iniciarScanner();
+
+}
+
+
+window.onload = function() {
+
+  if (
+    localStorage.getItem("cctem_staff")
+    === "autorizado"
+  ) {
+
+    iniciar();
+
+  }
+
+};
+
+</script>
+
+</body>
+</html>
