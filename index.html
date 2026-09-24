@@ -36,7 +36,7 @@
     }
 
     button {
-      padding: 14px 25px;
+      padding: 12px 20px;
       font-size: 18px;
       border: none;
       border-radius: 8px;
@@ -49,14 +49,43 @@
       margin: 25px auto 15px;
     }
 
-    #boton-enfocar {
+    #zoom-container {
       display: none;
       margin: 10px auto 20px;
+      max-width: 350px;
+    }
+
+    #zoom-container p {
+      margin: 5px 0 10px;
       font-size: 18px;
+      font-weight: bold;
+    }
+
+    #zoom-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    #zoom-controls button {
+      width: 50px;
+      height: 45px;
+      padding: 0;
+      font-size: 25px;
       background: #222;
       color: white;
-      width: 90%;
-      max-width: 300px;
+    }
+
+    #zoom-value {
+      min-width: 65px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    #zoom-slider {
+      width: 85%;
+      margin-top: 12px;
     }
 
     #resultado {
@@ -99,12 +128,38 @@
 
     <div id="reader"></div>
 
-    <button
-      id="boton-enfocar"
-      onclick="enfocarCamara()"
-    >
-      🔍 ENFOCAR
-    </button>
+    <!-- CONTROL DE ZOOM -->
+    <div id="zoom-container">
+
+      <p>🔍 Zoom</p>
+
+      <div id="zoom-controls">
+
+        <button onclick="cambiarZoom(-0.5)">
+          −
+        </button>
+
+        <span id="zoom-value">
+          1.0×
+        </span>
+
+        <button onclick="cambiarZoom(0.5)">
+          +
+        </button>
+
+      </div>
+
+      <input
+        type="range"
+        id="zoom-slider"
+        min="1"
+        max="3"
+        step="0.1"
+        value="1"
+        oninput="aplicarZoomDesdeSlider()"
+      >
+
+    </div>
 
     <div id="resultado"></div>
 
@@ -118,7 +173,10 @@ const CLAVE = "DIVAOK";
 const SCRIPT_URL =
 "https://script.google.com/macros/s/AKfycby0nPZcKIbiyDBbzWi-tPX0AwnGsljuB04yflYGwyxa5oyPTQzAcFGDI5OGuyGFXmiLGg/exec";
 
+
 let scanner = null;
+let videoTrack = null;
+let zoomActual = 1;
 
 
 /* ==========================================
@@ -210,7 +268,7 @@ function iniciarScanner() {
 
       scanner.stop();
 
-      document.getElementById("boton-enfocar").style.display =
+      document.getElementById("zoom-container").style.display =
         "none";
 
       registrar(decodedText);
@@ -221,12 +279,7 @@ function iniciarScanner() {
 
   ).then(() => {
 
-    /*
-     * Mostramos el botón una vez que
-     * la cámara ya está funcionando.
-     */
-    document.getElementById("boton-enfocar").style.display =
-      "block";
+    prepararZoom();
 
   }).catch((error) => {
 
@@ -240,99 +293,178 @@ function iniciarScanner() {
 
 
 /* ==========================================
-   BOTÓN ENFOCAR
+   PREPARAR ZOOM
    ========================================== */
 
-async function enfocarCamara() {
+function prepararZoom() {
+
+  const video =
+    document.querySelector("#reader video");
+
+  if (!video) {
+    return;
+  }
+
+  const stream = video.srcObject;
+
+  if (!stream) {
+    return;
+  }
+
+  const tracks = stream.getVideoTracks();
+
+  if (!tracks.length) {
+    return;
+  }
+
+  videoTrack = tracks[0];
+
+  const capabilities =
+    videoTrack.getCapabilities();
+
+  /*
+   * Comprobamos si el dispositivo permite
+   * controlar el zoom desde el navegador.
+   */
+
+  if (
+    capabilities.zoom !== undefined
+  ) {
+
+    const minZoom =
+      capabilities.zoom.min || 1;
+
+    const maxZoom =
+      Math.min(
+        capabilities.zoom.max || 3,
+        3
+      );
+
+    zoomActual = minZoom;
+
+    const slider =
+      document.getElementById("zoom-slider");
+
+    slider.min = minZoom;
+    slider.max = maxZoom;
+    slider.step = 0.1;
+    slider.value = minZoom;
+
+    actualizarTextoZoom();
+
+    document.getElementById("zoom-container").style.display =
+      "block";
+
+  }
+
+}
+
+
+/* ==========================================
+   CAMBIAR ZOOM CON + / -
+   ========================================== */
+
+function cambiarZoom(cantidad) {
+
+  if (!videoTrack) {
+    return;
+  }
+
+  const capabilities =
+    videoTrack.getCapabilities();
+
+  if (capabilities.zoom === undefined) {
+
+    document.getElementById("resultado").innerHTML =
+      "⚠️ Este iPhone no permite controlar el zoom desde el navegador.";
+
+    return;
+
+  }
+
+  const minZoom =
+    capabilities.zoom.min || 1;
+
+  const maxZoom =
+    Math.min(
+      capabilities.zoom.max || 3,
+      3
+    );
+
+  zoomActual += cantidad;
+
+  zoomActual =
+    Math.max(
+      minZoom,
+      Math.min(maxZoom, zoomActual)
+    );
+
+  aplicarZoom();
+
+}
+
+
+/* ==========================================
+   ZOOM DESDE SLIDER
+   ========================================== */
+
+function aplicarZoomDesdeSlider() {
+
+  zoomActual =
+    parseFloat(
+      document.getElementById("zoom-slider").value
+    );
+
+  aplicarZoom();
+
+}
+
+
+/* ==========================================
+   APLICAR ZOOM
+   ========================================== */
+
+async function aplicarZoom() {
+
+  if (!videoTrack) {
+    return;
+  }
 
   try {
 
-    /*
-     * Buscamos el video que está utilizando
-     * html5-qrcode.
-     */
-    const video =
-      document.querySelector("#reader video");
-
-    if (!video) {
-
-      document.getElementById("resultado").innerHTML =
-        "⚠️ La cámara todavía no está lista.";
-
-      return;
-
-    }
-
-
-    /*
-     * Obtenemos la pista de video de la cámara.
-     */
-    const stream = video.srcObject;
-
-    if (!stream) {
-
-      document.getElementById("resultado").innerHTML =
-        "⚠️ No se pudo acceder a la cámara.";
-
-      return;
-
-    }
-
-
-    const tracks = stream.getVideoTracks();
-
-    if (!tracks.length) {
-
-      document.getElementById("resultado").innerHTML =
-        "⚠️ No se encontró la cámara.";
-
-      return;
-
-    }
-
-
-    const track = tracks[0];
-
-
-    /*
-     * Pedimos enfoque puntual.
-     */
-    await track.applyConstraints({
+    await videoTrack.applyConstraints({
 
       advanced: [
         {
-          focusMode: "single-shot"
+          zoom: zoomActual
         }
       ]
 
     });
 
-
-    document.getElementById("resultado").innerHTML =
-      "🔍 Enfoque realizado. Apunta al código.";
-
-
-    /*
-     * Quitamos el mensaje después de un momento.
-     */
-    setTimeout(() => {
-
-      document.getElementById("resultado").innerHTML = "";
-
-    }, 1500);
-
+    actualizarTextoZoom();
 
   } catch (error) {
 
-    /*
-     * Algunos teléfonos/navegadores no permiten
-     * controlar el enfoque desde una página web.
-     */
     document.getElementById("resultado").innerHTML =
-      "⚠️ Este teléfono no permite controlar el enfoque desde el navegador.<br>" +
-      "Acerca o aleja un poco la cámara.";
+      "⚠️ No se pudo cambiar el zoom.";
 
   }
+
+}
+
+
+/* ==========================================
+   ACTUALIZAR TEXTO
+   ========================================== */
+
+function actualizarTextoZoom() {
+
+  document.getElementById("zoom-value").innerText =
+    zoomActual.toFixed(1) + "×";
+
+  document.getElementById("zoom-slider").value =
+    zoomActual;
 
 }
 
