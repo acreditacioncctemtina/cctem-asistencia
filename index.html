@@ -40,12 +40,23 @@
       font-size: 18px;
       border: none;
       border-radius: 8px;
+      cursor: pointer;
     }
 
     #reader {
       width: 100%;
       max-width: 400px;
-      margin: 25px auto;
+      margin: 25px auto 15px;
+    }
+
+    #boton-enfocar {
+      display: none;
+      margin: 10px auto 20px;
+      font-size: 18px;
+      background: #222;
+      color: white;
+      width: 90%;
+      max-width: 300px;
     }
 
     #resultado {
@@ -84,9 +95,16 @@
 
     <h1>📷 Asistencia</h1>
 
-    <p>Escanea el código de la credencial</p>
+    <p>Apunta al código de la credencial</p>
 
     <div id="reader"></div>
+
+    <button
+      id="boton-enfocar"
+      onclick="enfocarCamara()"
+    >
+      🔍 ENFOCAR
+    </button>
 
     <div id="resultado"></div>
 
@@ -100,10 +118,17 @@ const CLAVE = "DIVAOK";
 const SCRIPT_URL =
 "https://script.google.com/macros/s/AKfycby0nPZcKIbiyDBbzWi-tPX0AwnGsljuB04yflYGwyxa5oyPTQzAcFGDI5OGuyGFXmiLGg/exec";
 
+let scanner = null;
+
+
+/* ==========================================
+   LOGIN
+   ========================================== */
 
 function entrar() {
 
-  const clave = document.getElementById("clave").value;
+  const clave =
+    document.getElementById("clave").value;
 
   if (clave !== CLAVE) {
 
@@ -123,6 +148,10 @@ function entrar() {
 }
 
 
+/* ==========================================
+   INICIAR SISTEMA
+   ========================================== */
+
 function iniciar() {
 
   document.getElementById("login").style.display =
@@ -136,9 +165,13 @@ function iniciar() {
 }
 
 
+/* ==========================================
+   INICIAR SCANNER
+   ========================================== */
+
 function iniciarScanner() {
 
-  const scanner = new Html5Qrcode("reader");
+  scanner = new Html5Qrcode("reader");
 
   scanner.start(
 
@@ -154,19 +187,9 @@ function iniciarScanner() {
         height: 180
       },
 
-      /*
-       * Intentar mantener la cámara enfocada
-       * continuamente en el código.
-       *
-       * Los teléfonos que no soporten esta opción
-       * simplemente la ignorarán.
-       */
       videoConstraints: {
         facingMode: {
           ideal: "environment"
-        },
-        focusMode: {
-          ideal: "continuous"
         }
       },
 
@@ -187,13 +210,25 @@ function iniciarScanner() {
 
       scanner.stop();
 
+      document.getElementById("boton-enfocar").style.display =
+        "none";
+
       registrar(decodedText);
 
     },
 
     () => {}
 
-  ).catch((error) => {
+  ).then(() => {
+
+    /*
+     * Mostramos el botón una vez que
+     * la cámara ya está funcionando.
+     */
+    document.getElementById("boton-enfocar").style.display =
+      "block";
+
+  }).catch((error) => {
 
     document.getElementById("resultado").innerHTML =
       "❌ No se pudo abrir la cámara.<br><br>" +
@@ -204,9 +239,112 @@ function iniciarScanner() {
 }
 
 
+/* ==========================================
+   BOTÓN ENFOCAR
+   ========================================== */
+
+async function enfocarCamara() {
+
+  try {
+
+    /*
+     * Buscamos el video que está utilizando
+     * html5-qrcode.
+     */
+    const video =
+      document.querySelector("#reader video");
+
+    if (!video) {
+
+      document.getElementById("resultado").innerHTML =
+        "⚠️ La cámara todavía no está lista.";
+
+      return;
+
+    }
+
+
+    /*
+     * Obtenemos la pista de video de la cámara.
+     */
+    const stream = video.srcObject;
+
+    if (!stream) {
+
+      document.getElementById("resultado").innerHTML =
+        "⚠️ No se pudo acceder a la cámara.";
+
+      return;
+
+    }
+
+
+    const tracks = stream.getVideoTracks();
+
+    if (!tracks.length) {
+
+      document.getElementById("resultado").innerHTML =
+        "⚠️ No se encontró la cámara.";
+
+      return;
+
+    }
+
+
+    const track = tracks[0];
+
+
+    /*
+     * Pedimos enfoque puntual.
+     */
+    await track.applyConstraints({
+
+      advanced: [
+        {
+          focusMode: "single-shot"
+        }
+      ]
+
+    });
+
+
+    document.getElementById("resultado").innerHTML =
+      "🔍 Enfoque realizado. Apunta al código.";
+
+
+    /*
+     * Quitamos el mensaje después de un momento.
+     */
+    setTimeout(() => {
+
+      document.getElementById("resultado").innerHTML = "";
+
+    }, 1500);
+
+
+  } catch (error) {
+
+    /*
+     * Algunos teléfonos/navegadores no permiten
+     * controlar el enfoque desde una página web.
+     */
+    document.getElementById("resultado").innerHTML =
+      "⚠️ Este teléfono no permite controlar el enfoque desde el navegador.<br>" +
+      "Acerca o aleja un poco la cámara.";
+
+  }
+
+}
+
+
+/* ==========================================
+   REGISTRAR CÓDIGO
+   ========================================== */
+
 function registrar(codigoLeido) {
 
   let rut = codigoLeido.trim();
+
 
   /*
    * Si es un QR, contiene nuestra URL.
@@ -217,7 +355,8 @@ function registrar(codigoLeido) {
 
     const url = new URL(codigoLeido);
 
-    const rutQR = url.searchParams.get("rut");
+    const rutQR =
+      url.searchParams.get("rut");
 
     if (rutQR) {
       rut = rutQR;
@@ -256,6 +395,10 @@ function registrar(codigoLeido) {
 }
 
 
+/* ==========================================
+   REINICIAR SCANNER
+   ========================================== */
+
 function reiniciar() {
 
   document.getElementById("resultado").innerHTML = "";
@@ -264,6 +407,10 @@ function reiniciar() {
 
 }
 
+
+/* ==========================================
+   MANTENER LOGIN
+   ========================================== */
 
 window.onload = function() {
 
