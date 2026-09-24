@@ -154,6 +154,22 @@ function iniciarScanner() {
         height: 180
       },
 
+      /*
+       * Intentar mantener la cámara enfocada
+       * continuamente en el código.
+       *
+       * Los teléfonos que no soporten esta opción
+       * simplemente la ignorarán.
+       */
+      videoConstraints: {
+        facingMode: {
+          ideal: "environment"
+        },
+        focusMode: {
+          ideal: "continuous"
+        }
+      },
+
       formatsToSupport: [
         Html5QrcodeSupportedFormats.QR_CODE,
         Html5QrcodeSupportedFormats.CODE_128,
